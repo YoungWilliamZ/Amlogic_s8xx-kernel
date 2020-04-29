@@ -1,15 +1,9 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * GPIO definitions for Amlogic Meson8b SoCs
  *
  * Copyright (C) 2015 Endless Mobile, Inc.
  * Author: Carlo Caione <carlo@endlessm.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _DT_BINDINGS_MESON8B_GPIO_H
@@ -106,6 +100,8 @@
 #define DIF_4_P		81
 #define DIF_4_N		82
 
+#define GPIO_BSD_EN	83
+
 /* AO GPIO chip */
 #define GPIOAO_0	0
 #define GPIOAO_1	1
@@ -121,7 +117,6 @@
 #define GPIOAO_11	11
 #define GPIOAO_12	12
 #define GPIOAO_13	13
-#define GPIO_BSD_EN	14
-#define GPIO_TEST_N	15
+#define GPIO_TEST_N	14
 
 #endif /* _DT_BINDINGS_MESON8B_GPIO_H */

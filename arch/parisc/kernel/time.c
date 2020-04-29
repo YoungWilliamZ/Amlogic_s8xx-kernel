@@ -40,7 +40,7 @@
 
 #include <linux/timex.h>
 
-static unsigned long clocktick __read_mostly;	/* timer cycles per tick */
+static unsigned long clocktick __ro_after_init;	/* timer cycles per tick */
 
 /*
  * We keep time on PA-RISC Linux by using the Interval Timer which is
@@ -205,7 +205,7 @@ static int __init rtc_init(void)
 device_initcall(rtc_init);
 #endif
 
-void read_persistent_clock(struct timespec *ts)
+void read_persistent_clock64(struct timespec64 *ts)
 {
 	static struct pdc_tod tod_data;
 	if (pdc_tod_read(&tod_data) == 0) {

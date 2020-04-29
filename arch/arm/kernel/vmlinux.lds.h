@@ -27,28 +27,21 @@
 
 #define PROC_INFO							\
 		. = ALIGN(4);						\
-		VMLINUX_SYMBOL(__proc_info_begin) = .;			\
+		__proc_info_begin = .;					\
 		*(.proc.info.init)					\
-		VMLINUX_SYMBOL(__proc_info_end) = .;
-
-#define HYPERVISOR_TEXT							\
-		VMLINUX_SYMBOL(__hyp_text_start) = .;			\
-		*(.hyp.text)						\
-		VMLINUX_SYMBOL(__hyp_text_end) = .;
+		__proc_info_end = .;
 
 #define IDMAP_TEXT							\
 		ALIGN_FUNCTION();					\
-		VMLINUX_SYMBOL(__idmap_text_start) = .;			\
+		__idmap_text_start = .;					\
 		*(.idmap.text)						\
-		VMLINUX_SYMBOL(__idmap_text_end) = .;			\
-		. = ALIGN(PAGE_SIZE);					\
-		VMLINUX_SYMBOL(__hyp_idmap_text_start) = .;		\
-		*(.hyp.idmap.text)					\
-		VMLINUX_SYMBOL(__hyp_idmap_text_end) = .;
+		__idmap_text_end = .;					\
 
 #define ARM_DISCARD							\
 		*(.ARM.exidx.exit.text)					\
 		*(.ARM.extab.exit.text)					\
+		*(.ARM.exidx.text.exit)					\
+		*(.ARM.extab.text.exit)					\
 		ARM_CPU_DISCARD(*(.ARM.exidx.cpuexit.text))		\
 		ARM_CPU_DISCARD(*(.ARM.extab.cpuexit.text))		\
 		ARM_EXIT_DISCARD(EXIT_TEXT)				\
@@ -70,7 +63,6 @@
 		SCHED_TEXT						\
 		CPUIDLE_TEXT						\
 		LOCK_TEXT						\
-		HYPERVISOR_TEXT						\
 		KPROBES_TEXT						\
 		*(.gnu.warning)						\
 		*(.glue_7)						\

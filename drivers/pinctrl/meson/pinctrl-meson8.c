@@ -1,14 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /*
  * Pin controller and GPIO driver for Amlogic Meson8 and Meson8m2.
  *
  * Copyright (C) 2014 Beniamino Galvani <b.galvani@gmail.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <dt-bindings/gpio/meson8-gpio.h>
@@ -136,6 +130,7 @@ static const struct pinctrl_pin_desc meson8_cbus_pins[] = {
 	MESON_PIN(BOOT_16),
 	MESON_PIN(BOOT_17),
 	MESON_PIN(BOOT_18),
+	MESON_PIN(GPIO_BSD_EN),
 };
 
 static const struct pinctrl_pin_desc meson8_aobus_pins[] = {
@@ -153,7 +148,6 @@ static const struct pinctrl_pin_desc meson8_aobus_pins[] = {
 	MESON_PIN(GPIOAO_11),
 	MESON_PIN(GPIOAO_12),
 	MESON_PIN(GPIOAO_13),
-	MESON_PIN(GPIO_BSD_EN),
 	MESON_PIN(GPIO_TEST_N),
 };
 
@@ -506,6 +500,33 @@ static struct meson_pmx_group meson8_cbus_groups[] = {
 	GPIO_GROUP(GPIOZ_12),
 	GPIO_GROUP(GPIOZ_13),
 	GPIO_GROUP(GPIOZ_14),
+	GPIO_GROUP(CARD_0),
+	GPIO_GROUP(CARD_1),
+	GPIO_GROUP(CARD_2),
+	GPIO_GROUP(CARD_3),
+	GPIO_GROUP(CARD_4),
+	GPIO_GROUP(CARD_5),
+	GPIO_GROUP(CARD_6),
+	GPIO_GROUP(BOOT_0),
+	GPIO_GROUP(BOOT_1),
+	GPIO_GROUP(BOOT_2),
+	GPIO_GROUP(BOOT_3),
+	GPIO_GROUP(BOOT_4),
+	GPIO_GROUP(BOOT_5),
+	GPIO_GROUP(BOOT_6),
+	GPIO_GROUP(BOOT_7),
+	GPIO_GROUP(BOOT_8),
+	GPIO_GROUP(BOOT_9),
+	GPIO_GROUP(BOOT_10),
+	GPIO_GROUP(BOOT_11),
+	GPIO_GROUP(BOOT_12),
+	GPIO_GROUP(BOOT_13),
+	GPIO_GROUP(BOOT_14),
+	GPIO_GROUP(BOOT_15),
+	GPIO_GROUP(BOOT_16),
+	GPIO_GROUP(BOOT_17),
+	GPIO_GROUP(BOOT_18),
+	GPIO_GROUP(GPIO_BSD_EN),
 
 	/* bank X */
 	GROUP(sd_d0_a,		8,	5),
@@ -740,7 +761,6 @@ static struct meson_pmx_group meson8_aobus_groups[] = {
 	GPIO_GROUP(GPIOAO_11),
 	GPIO_GROUP(GPIOAO_12),
 	GPIO_GROUP(GPIOAO_13),
-	GPIO_GROUP(GPIO_BSD_EN),
 	GPIO_GROUP(GPIO_TEST_N),
 
 	/* bank AO */
@@ -774,7 +794,7 @@ static struct meson_pmx_group meson8_aobus_groups[] = {
 	GROUP(hdmi_cec_ao,		0,	17),
 };
 
-static const char * const gpio_groups[] = {
+static const char * const gpio_periphs_groups[] = {
 	"GPIOX_0", "GPIOX_1", "GPIOX_2", "GPIOX_3", "GPIOX_4",
 	"GPIOX_5", "GPIOX_6", "GPIOX_7", "GPIOX_8", "GPIOX_9",
 	"GPIOX_10", "GPIOX_11", "GPIOX_12", "GPIOX_13", "GPIOX_14",
@@ -808,10 +828,14 @@ static const char * const gpio_groups[] = {
 	"BOOT_10", "BOOT_11", "BOOT_12", "BOOT_13", "BOOT_14",
 	"BOOT_15", "BOOT_16", "BOOT_17", "BOOT_18",
 
+	"GPIO_BSD_EN"
+};
+
+static const char * const gpio_aobus_groups[] = {
 	"GPIOAO_0", "GPIOAO_1", "GPIOAO_2", "GPIOAO_3",
 	"GPIOAO_4", "GPIOAO_5", "GPIOAO_6", "GPIOAO_7",
 	"GPIOAO_8", "GPIOAO_9", "GPIOAO_10", "GPIOAO_11",
-	"GPIOAO_12", "GPIOAO_13", "GPIO_BSD_EN", "GPIO_TEST_N"
+	"GPIOAO_12", "GPIOAO_13", "GPIO_TEST_N"
 };
 
 static const char * const sd_a_groups[] = {
@@ -994,7 +1018,7 @@ static const char * const hdmi_cec_ao_groups[] = {
 };
 
 static struct meson_pmx_func meson8_cbus_functions[] = {
-	FUNCTION(gpio),
+	FUNCTION(gpio_periphs),
 	FUNCTION(sd_a),
 	FUNCTION(sdxc_a),
 	FUNCTION(pcm_a),
@@ -1030,6 +1054,7 @@ static struct meson_pmx_func meson8_cbus_functions[] = {
 };
 
 static struct meson_pmx_func meson8_aobus_functions[] = {
+	FUNCTION(gpio_aobus),
 	FUNCTION(uart_ao),
 	FUNCTION(remote),
 	FUNCTION(i2c_slave_ao),
@@ -1041,19 +1066,37 @@ static struct meson_pmx_func meson8_aobus_functions[] = {
 };
 
 static struct meson_bank meson8_cbus_banks[] = {
-	/*   name    first     last         irq       pullen  pull    dir     out     in  */
-	BANK("X",    GPIOX_0,  GPIOX_21,    112, 133, 4,  0,  4,  0,  0,  0,  1,  0,  2,  0),
-	BANK("Y",    GPIOY_0,  GPIOY_16,    95,  111, 3,  0,  3,  0,  3,  0,  4,  0,  5,  0),
-	BANK("DV",   GPIODV_0, GPIODV_29,   65,   94, 0,  0,  0,  0,  7,  0,  8,  0,  9,  0),
-	BANK("H",    GPIOH_0,  GPIOH_9,     29,   38, 1, 16,  1, 16,  9, 19, 10, 19, 11, 19),
-	BANK("Z",    GPIOZ_0,  GPIOZ_14,    14,   28, 1,  0,  1,  0,  3, 17,  4, 17,  5, 17),
-	BANK("CARD", CARD_0,   CARD_6,      58,   64, 2, 20,  2, 20,  0, 22,  1, 22,  2, 22),
-	BANK("BOOT", BOOT_0,   BOOT_18,     39,   57, 2,  0,  2,  0,  9,  0, 10,  0, 11,  0),
+	/*
+	 *   name      first        last         irq       pullen  pull
+	 *   dir      out      in
+	 */
+	BANK("X",      GPIOX_0,     GPIOX_21,    112, 133,  4,  0,  4,  0,
+	      0,  0,   1,  0,   2,  0),
+	BANK("Y",      GPIOY_0,     GPIOY_16,    95,  111,  3,  0,  3,  0,
+	      3,  0,   4,  0,   5,  0),
+	BANK("DV",     GPIODV_0,    GPIODV_29,   65,   94,  0,  0,  0,  0,
+	      7,  0,   8,  0,   9,  0),
+	BANK("H",      GPIOH_0,     GPIOH_9,     29,   38,  1, 16,  1, 16,
+	      9, 19,  10, 19,  11, 19),
+	BANK("Z",      GPIOZ_0,     GPIOZ_14,    14,   28,  1,  0,  1,  0,
+	      3, 17,   4, 17,   5, 17),
+	BANK("CARD",   CARD_0,      CARD_6,      58,   64,  2, 20,  2, 20,
+	      0, 22,   1, 22,   2, 22),
+	BANK("BOOT",   BOOT_0,      BOOT_18,     39,   57,  2,  0,  2,  0,
+	      9,  0,  10,  0,  11,  0),
+	BANK("BSD_EN", GPIO_BSD_EN, GPIO_BSD_EN, -1,   -1, -1, -1,  2,  0,
+	     -1, -1,   0, 31,   0, 31),
 };
 
 static struct meson_bank meson8_aobus_banks[] = {
-	/*   name    first     last         irq    pullen  pull    dir     out     in  */
-	BANK("AO",   GPIOAO_0, GPIO_TEST_N, 0, 13, 0,  0,  0, 16,  0,  0,  0, 16,  1,  0),
+	/*
+	 *   name      first        last          irq      pullen   pull
+	 *   dir      out     in
+	 */
+	BANK("AO",     GPIOAO_0,    GPIOAO_13,     0, 13,  0, 16,  0,  0,
+	      0,  0,  0, 16,  1,  0),
+	BANK("TEST_N", GPIO_TEST_N, GPIO_TEST_N,  -1, -1,  0, 30,  0, 14,
+	     -1, -1,  0, 31,  0, 31),
 };
 
 static struct meson_pinctrl_data meson8_cbus_pinctrl_data = {
@@ -1080,6 +1123,7 @@ static struct meson_pinctrl_data meson8_aobus_pinctrl_data = {
 	.num_funcs	= ARRAY_SIZE(meson8_aobus_functions),
 	.num_banks	= ARRAY_SIZE(meson8_aobus_banks),
 	.pmx_ops	= &meson8_pmx_ops,
+	.parse_dt	= &meson8_aobus_parse_dt_extra,
 };
 
 static const struct of_device_id meson8_pinctrl_dt_match[] = {

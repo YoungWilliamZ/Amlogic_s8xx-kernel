@@ -1,11 +1,8 @@
+// SPDX-License-Identifier: GPL-2.0-only
 /****************************************************************************
  * Driver for Solarflare network controllers and boards
  * Copyright 2005-2006 Fen Systems Ltd.
  * Copyright 2006-2013 Solarflare Communications Inc.
- *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation, incorporated herein by reference.
  */
 
 #include <linux/bitops.h>
@@ -18,6 +15,7 @@
 #include "net_driver.h"
 #include "bitfield.h"
 #include "efx.h"
+#include "rx_common.h"
 #include "nic.h"
 #include "farch_regs.h"
 #include "sriov.h"
@@ -2794,6 +2792,7 @@ int efx_farch_filter_table_probe(struct efx_nic *efx)
 	if (!state)
 		return -ENOMEM;
 	efx->filter_state = state;
+	init_rwsem(&state->lock);
 
 	table = &state->table[EFX_FARCH_FILTER_TABLE_RX_IP];
 	table->id = EFX_FARCH_FILTER_TABLE_RX_IP;
@@ -2826,7 +2825,8 @@ int efx_farch_filter_table_probe(struct efx_nic *efx)
 					     GFP_KERNEL);
 		if (!table->used_bitmap)
 			goto fail;
-		table->spec = vzalloc(table->size * sizeof(*table->spec));
+		table->spec = vzalloc(array_size(sizeof(*table->spec),
+						 table->size));
 		if (!table->spec)
 			goto fail;
 	}

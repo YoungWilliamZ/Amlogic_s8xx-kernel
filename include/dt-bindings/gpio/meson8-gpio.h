@@ -1,14 +1,8 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * GPIO definitions for Amlogic Meson8 SoCs
  *
  * Copyright (C) 2014 Beniamino Galvani <b.galvani@gmail.com>
- *
- * This program is free software; you can redistribute it and/or
- * modify it under the terms of the GNU General Public License
- * version 2 as published by the Free Software Foundation.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef _DT_BINDINGS_MESON8_GPIO_H
@@ -135,6 +129,7 @@
 #define BOOT_16		117
 #define BOOT_17		118
 #define BOOT_18		119
+#define GPIO_BSD_EN	120
 
 /* Second GPIO chip */
 #define GPIOAO_0	0
@@ -151,7 +146,6 @@
 #define GPIOAO_11	11
 #define GPIOAO_12	12
 #define GPIOAO_13	13
-#define GPIO_BSD_EN	14
-#define GPIO_TEST_N	15
+#define GPIO_TEST_N	14
 
 #endif /* _DT_BINDINGS_MESON8_GPIO_H */

@@ -12,30 +12,35 @@
 
 #include "stratix10-clk.h"
 
-static const char * const pll_mux[] = { "osc1", "cb_intosc_hs_div2_clk",
-					"f2s_free_clk",};
+static const char * const pll_mux[] = { "osc1", "cb-intosc-hs-div2-clk",
+					"f2s-free-clk",};
 static const char * const cntr_mux[] = { "main_pll", "periph_pll",
-					 "osc1", "cb_intosc_hs_div2_clk",
-					 "f2s_free_clk"};
-static const char * const boot_mux[] = { "osc1", "cb_intosc_hs_div2_clk",};
+					 "osc1", "cb-intosc-hs-div2-clk",
+					 "f2s-free-clk"};
+static const char * const boot_mux[] = { "osc1", "cb-intosc-hs-div2-clk",};
 
 static const char * const noc_free_mux[] = {"main_noc_base_clk",
 					    "peri_noc_base_clk",
-					    "osc1", "cb_intosc_hs_div2_clk",
-					    "f2s_free_clk"};
+					    "osc1", "cb-intosc-hs-div2-clk",
+					    "f2s-free-clk"};
 
 static const char * const emaca_free_mux[] = {"peri_emaca_clk", "boot_clk"};
 static const char * const emacb_free_mux[] = {"peri_emacb_clk", "boot_clk"};
 static const char * const emac_ptp_free_mux[] = {"peri_emac_ptp_clk", "boot_clk"};
 static const char * const gpio_db_free_mux[] = {"peri_gpio_db_clk", "boot_clk"};
-static const char * const sdmmc_free_mux[] = {"peri_sdmmc_clk", "boot_clk"};
+static const char * const sdmmc_free_mux[] = {"main_sdmmc_clk", "boot_clk"};
 static const char * const s2f_usr1_free_mux[] = {"peri_s2f_usr1_clk", "boot_clk"};
 static const char * const psi_ref_free_mux[] = {"peri_psi_ref_clk", "boot_clk"};
 static const char * const mpu_mux[] = { "mpu_free_clk", "boot_clk",};
 
-static const char * const s2f_usr0_mux[] = {"f2s_free_clk", "boot_clk"};
+static const char * const s2f_usr0_mux[] = {"f2s-free-clk", "boot_clk"};
 static const char * const emac_mux[] = {"emaca_free_clk", "emacb_free_clk"};
 static const char * const noc_mux[] = {"noc_free_clk", "boot_clk"};
+
+static const char * const mpu_free_mux[] = {"main_mpu_base_clk",
+					    "peri_mpu_base_clk",
+					    "osc1", "cb-intosc-hs-div2-clk",
+					    "f2s-free-clk"};
 
 /* clocks in AO (always on) controller */
 static const struct stratix10_pll_clock s10_pll_clks[] = {
@@ -57,7 +62,7 @@ static const struct stratix10_perip_c_clock s10_main_perip_c_clks[] = {
 };
 
 static const struct stratix10_perip_cnt_clock s10_main_perip_cnt_clks[] = {
-	{ STRATIX10_MPU_FREE_CLK, "mpu_free_clk", NULL, cntr_mux, ARRAY_SIZE(cntr_mux),
+	{ STRATIX10_MPU_FREE_CLK, "mpu_free_clk", NULL, mpu_free_mux, ARRAY_SIZE(mpu_free_mux),
 	   0, 0x48, 0, 0, 0},
 	{ STRATIX10_NOC_FREE_CLK, "noc_free_clk", NULL, noc_free_mux, ARRAY_SIZE(noc_free_mux),
 	  0, 0x4C, 0, 0, 0},
@@ -98,9 +103,9 @@ static const struct stratix10_perip_cnt_clock s10_main_perip_cnt_clks[] = {
 	{ STRATIX10_NOC_CLK, "noc_clk", NULL, noc_mux, ARRAY_SIZE(noc_mux),
 	  0, 0, 0, 0x3C, 1},
 	{ STRATIX10_EMAC_A_FREE_CLK, "emaca_free_clk", NULL, emaca_free_mux, ARRAY_SIZE(emaca_free_mux),
-	  0, 0, 4, 0xB0, 0},
+	  0, 0, 2, 0xB0, 0},
 	{ STRATIX10_EMAC_B_FREE_CLK, "emacb_free_clk", NULL, emacb_free_mux, ARRAY_SIZE(emacb_free_mux),
-	  0, 0, 4, 0xB0, 1},
+	  0, 0, 2, 0xB0, 1},
 	{ STRATIX10_EMAC_PTP_FREE_CLK, "emac_ptp_free_clk", NULL, emac_ptp_free_mux,
 	  ARRAY_SIZE(emac_ptp_free_mux), 0, 0, 4, 0xB0, 2},
 	{ STRATIX10_GPIO_DB_FREE_CLK, "gpio_db_free_clk", NULL, gpio_db_free_mux,
@@ -156,8 +161,12 @@ static const struct stratix10_gate_clock s10_gate_clks[] = {
 	  8, 0, 0, 0, 0, 0, 0},
 	{ STRATIX10_SPI_M_CLK, "spi_m_clk", "l4_mp_clk", NULL, 1, 0, 0xA4,
 	  9, 0, 0, 0, 0, 0, 0},
-	{ STRATIX10_NAND_CLK, "nand_clk", "l4_main_clk", NULL, 1, 0, 0xA4,
+	{ STRATIX10_NAND_X_CLK, "nand_x_clk", "l4_mp_clk", NULL, 1, 0, 0xA4,
 	  10, 0, 0, 0, 0, 0, 0},
+	{ STRATIX10_NAND_CLK, "nand_clk", "nand_x_clk", NULL, 1, 0, 0xA4,
+	  10, 0, 0, 0, 0, 0, 4},
+	{ STRATIX10_NAND_ECC_CLK, "nand_ecc_clk", "nand_x_clk", NULL, 1, 0, 0xA4,
+	  10, 0, 0, 0, 0, 0, 4},
 };
 
 static int s10_clk_register_c_perip(const struct stratix10_perip_c_clock *clks,
@@ -168,9 +177,7 @@ static int s10_clk_register_c_perip(const struct stratix10_perip_c_clock *clks,
 	int i;
 
 	for (i = 0; i < nums; i++) {
-		clk = s10_register_periph(clks[i].name, clks[i].parent_name,
-					  clks[i].parent_names, clks[i].num_parents,
-					  clks[i].flags, base, clks[i].offset);
+		clk = s10_register_periph(&clks[i], base);
 		if (IS_ERR(clk)) {
 			pr_err("%s: failed to register clock %s\n",
 			       __func__, clks[i].name);
@@ -189,14 +196,7 @@ static int s10_clk_register_cnt_perip(const struct stratix10_perip_cnt_clock *cl
 	int i;
 
 	for (i = 0; i < nums; i++) {
-		clk = s10_register_cnt_periph(clks[i].name, clks[i].parent_name,
-					      clks[i].parent_names,
-					      clks[i].num_parents,
-					      clks[i].flags, base,
-					      clks[i].offset,
-					      clks[i].fixed_divider,
-					      clks[i].bypass_reg,
-					      clks[i].bypass_shift);
+		clk = s10_register_cnt_periph(&clks[i], base);
 		if (IS_ERR(clk)) {
 			pr_err("%s: failed to register clock %s\n",
 			       __func__, clks[i].name);
@@ -216,16 +216,7 @@ static int s10_clk_register_gate(const struct stratix10_gate_clock *clks,
 	int i;
 
 	for (i = 0; i < nums; i++) {
-		clk = s10_register_gate(clks[i].name, clks[i].parent_name,
-					clks[i].parent_names,
-					clks[i].num_parents,
-					clks[i].flags, base,
-					clks[i].gate_reg,
-					clks[i].gate_idx, clks[i].div_reg,
-					clks[i].div_offset, clks[i].div_width,
-					clks[i].bypass_reg,
-					clks[i].bypass_shift,
-					clks[i].fixed_div);
+		clk = s10_register_gate(&clks[i], base);
 		if (IS_ERR(clk)) {
 			pr_err("%s: failed to register clock %s\n",
 			       __func__, clks[i].name);
@@ -245,10 +236,7 @@ static int s10_clk_register_pll(const struct stratix10_pll_clock *clks,
 	int i;
 
 	for (i = 0; i < nums; i++) {
-		clk = s10_register_pll(clks[i].name, clks[i].parent_names,
-				    clks[i].num_parents,
-				    clks[i].flags, base,
-				    clks[i].offset);
+		clk = s10_register_pll(&clks[i], base);
 		if (IS_ERR(clk)) {
 			pr_err("%s: failed to register clock %s\n",
 			       __func__, clks[i].name);
@@ -260,46 +248,45 @@ static int s10_clk_register_pll(const struct stratix10_pll_clock *clks,
 	return 0;
 }
 
-static struct stratix10_clock_data *__socfpga_s10_clk_init(struct device_node *np,
+static struct stratix10_clock_data *__socfpga_s10_clk_init(struct platform_device *pdev,
 						    int nr_clks)
 {
+	struct device_node *np = pdev->dev.of_node;
+	struct device *dev = &pdev->dev;
 	struct stratix10_clock_data *clk_data;
 	struct clk **clk_table;
+	struct resource *res;
 	void __iomem *base;
 
-	base = of_iomap(np, 0);
-	if (!base) {
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	base = devm_ioremap_resource(dev, res);
+	if (IS_ERR(base)) {
 		pr_err("%s: failed to map clock registers\n", __func__);
-		goto err;
+		return ERR_CAST(base);
 	}
 
-	clk_data = kzalloc(sizeof(*clk_data), GFP_KERNEL);
+	clk_data = devm_kzalloc(dev, sizeof(*clk_data), GFP_KERNEL);
 	if (!clk_data)
-		goto err;
+		return ERR_PTR(-ENOMEM);
 
 	clk_data->base = base;
-	clk_table = kcalloc(nr_clks, sizeof(*clk_table), GFP_KERNEL);
+	clk_table = devm_kcalloc(dev, nr_clks, sizeof(*clk_table), GFP_KERNEL);
 	if (!clk_table)
-		goto err_data;
+		return ERR_PTR(-ENOMEM);
 
 	clk_data->clk_data.clks = clk_table;
 	clk_data->clk_data.clk_num = nr_clks;
 	of_clk_add_provider(np, of_clk_src_onecell_get, &clk_data->clk_data);
 	return clk_data;
-
-err_data:
-	kfree(clk_data);
-err:
-	return NULL;
 }
 
-static int s10_clkmgr_init(struct device_node *np)
+static int s10_clkmgr_init(struct platform_device *pdev)
 {
 	struct stratix10_clock_data *clk_data;
 
-	clk_data = __socfpga_s10_clk_init(np, STRATIX10_NUM_CLKS);
-	if (!clk_data)
-		return -ENOMEM;
+	clk_data = __socfpga_s10_clk_init(pdev, STRATIX10_NUM_CLKS);
+	if (IS_ERR(clk_data))
+		return PTR_ERR(clk_data);
 
 	s10_clk_register_pll(s10_pll_clks, ARRAY_SIZE(s10_pll_clks), clk_data);
 
@@ -317,11 +304,7 @@ static int s10_clkmgr_init(struct device_node *np)
 
 static int s10_clkmgr_probe(struct platform_device *pdev)
 {
-	struct device_node *np = pdev->dev.of_node;
-
-	s10_clkmgr_init(np);
-
-	return 0;
+	return	s10_clkmgr_init(pdev);
 }
 
 static const struct of_device_id stratix10_clkmgr_match_table[] = {
@@ -334,6 +317,7 @@ static struct platform_driver stratix10_clkmgr_driver = {
 	.probe		= s10_clkmgr_probe,
 	.driver		= {
 		.name	= "stratix10-clkmgr",
+		.suppress_bind_attrs = true,
 		.of_match_table = stratix10_clkmgr_match_table,
 	},
 };
