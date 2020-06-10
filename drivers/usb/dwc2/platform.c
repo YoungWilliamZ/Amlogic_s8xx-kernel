@@ -293,6 +293,60 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 	return 0;
 }
 
+static enum usb_role dwc2_usb_role_switch_get(struct usb_role_switch *sw)
+{
+	struct dwc2_hsotg *hsotg = usb_role_switch_get_drvdata(sw);
+
+	return dwc2_is_host_mode(hsotg) ? USB_ROLE_HOST : USB_ROLE_DEVICE;
+}
+
+static int dwc2_usb_role_switch_set(struct usb_role_switch *sw,
+				    enum usb_role role)
+{
+	struct dwc2_hsotg *hsotg = usb_role_switch_get_drvdata(sw);
+
+	switch (role) {
+	case USB_ROLE_HOST:
+		dwc2_force_mode(hsotg, true);
+		break;
+	case USB_ROLE_DEVICE:
+		dwc2_force_mode(hsotg, false);
+		break;
+	default:
+		dwc2_force_dr_mode(hsotg);
+		break;
+	}
+
+	return 0;
+}
+
+static int dwc2_usb_role_switch_register(struct dwc2_hsotg *hsotg)
+{
+	struct usb_role_switch_desc desc = {
+		.fwnode = dev_fwnode(hsotg->dev),
+		.get = dwc2_usb_role_switch_get,
+		.set = dwc2_usb_role_switch_set,
+		.allow_userspace_control = false,
+	};
+
+	if (!IS_ENABLED(CONFIG_USB_ROLE_SWITCH))
+		return 0;
+
+	if (hsotg->dr_mode != USB_DR_MODE_OTG)
+		return 0;
+
+	if (!of_property_read_bool(hsotg->dev->of_node, "usb-role-switch"))
+		return 0;
+
+	hsotg->role_switch = usb_role_switch_register(hsotg->dev, &desc);
+	if (IS_ERR(hsotg->role_switch))
+		return PTR_ERR(hsotg->role_switch);
+
+	usb_role_switch_set_drvdata(hsotg->role_switch, hsotg);
+
+	return 0;
+}
+
 /**
  * dwc2_driver_remove() - Called when the DWC_otg core is unregistered with the
  * DWC_otg driver
@@ -307,6 +361,8 @@ static int dwc2_lowlevel_hw_init(struct dwc2_hsotg *hsotg)
 static int dwc2_driver_remove(struct platform_device *dev)
 {
 	struct dwc2_hsotg *hsotg = platform_get_drvdata(dev);
+
+	usb_role_switch_put(hsotg->role_switch);
 
 	dwc2_debugfs_exit(hsotg);
 	if (hsotg->hcd_enabled)
@@ -360,6 +416,37 @@ static bool dwc2_check_core_endianness(struct dwc2_hsotg *hsotg)
 	    (snpsid & GSNPSID_ID_MASK) == DWC2_HS_IOT_ID)
 		return false;
 	return true;
+}
+
+/**
+ * Check core version
+ *
+ * @hsotg: Programming view of the DWC_otg controller
+ *
+ */
+int dwc2_check_core_version(struct dwc2_hsotg *hsotg)
+{
+	struct dwc2_hw_params *hw = &hsotg->hw_params;
+
+	/*
+	 * Attempt to ensure this device is really a DWC_otg Controller.
+	 * Read and verify the GSNPSID register contents. The value should be
+	 * 0x45f4xxxx, 0x5531xxxx or 0x5532xxxx
+	 */
+
+	hw->snpsid = dwc2_readl(hsotg, GSNPSID);
+	if ((hw->snpsid & GSNPSID_ID_MASK) != DWC2_OTG_ID &&
+	    (hw->snpsid & GSNPSID_ID_MASK) != DWC2_FS_IOT_ID &&
+	    (hw->snpsid & GSNPSID_ID_MASK) != DWC2_HS_IOT_ID) {
+		dev_err(hsotg->dev, "Bad value for GSNPSID: 0x%08x\n",
+			hw->snpsid);
+		return -ENODEV;
+	}
+
+	dev_dbg(hsotg->dev, "Core Release: %1x.%1x%1x%1x (snpsid=%x)\n",
+		hw->snpsid >> 12 & 0xf, hw->snpsid >> 8 & 0xf,
+		hw->snpsid >> 4 & 0xf, hw->snpsid & 0xf, hw->snpsid);
+	return 0;
 }
 
 /**
@@ -443,6 +530,14 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	hsotg->need_phy_for_wake =
 		of_property_read_bool(dev->dev.of_node,
 				      "snps,need-phy-for-wake");
+
+	/*
+	 * Before performing any core related operations
+	 * check core version.
+	 */
+	retval = dwc2_check_core_version(hsotg);
+	if (retval)
+		goto error;
 
 	/*
 	 * Reset before dwc2_get_hwparams() then it could get power-on real
@@ -536,8 +631,24 @@ static int dwc2_driver_probe(struct platform_device *dev)
 	if (hsotg->dr_mode == USB_DR_MODE_PERIPHERAL)
 		dwc2_lowlevel_hw_disable(hsotg);
 
+	retval = dwc2_usb_role_switch_register(hsotg);
+	if (retval)
+		goto error_debugfs;
+
+	retval = of_platform_populate(dev->dev.of_node, NULL, NULL, &dev->dev);
+	if (retval) {
+		dev_err(hsotg->dev,
+			"Failed to create child devices/connectors for %p\n",
+			dev->dev.of_node);
+		goto error_role_switch;
+	}
+
 	return 0;
 
+error_role_switch:
+	usb_role_switch_put(hsotg->role_switch);
+error_debugfs:
+	dwc2_debugfs_exit(hsotg);
 error_init:
 	if (hsotg->params.activate_stm_id_vb_detection)
 		regulator_disable(hsotg->usb33d);

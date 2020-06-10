@@ -22,4 +22,4 @@ config DRM_MESON_MX_HDMI
 	depends on ARM || COMPILE_TEST
 	depends on DRM_MESON
 	default y if DRM_MESON
-	select CEC_CORE if CEC_NOTIFIER
+	select DRM_TRANSWITCH_TXC_48352

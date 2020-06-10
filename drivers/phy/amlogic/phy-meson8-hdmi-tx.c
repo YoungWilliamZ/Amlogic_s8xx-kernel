@@ -7,6 +7,7 @@
 
 #include <linux/bitfield.h>
 #include <linux/bits.h>
+#include <linux/clk.h>
 #include <linux/mfd/syscon.h>
 #include <linux/module.h>
 #include <linux/of_device.h>
@@ -26,21 +27,21 @@
 
 struct phy_meson8_hdmi_tx_priv {
 	struct regmap		*hhi;
-	unsigned int		pixel_clock;
+	struct clk		*tmds_clk;
 };
 
-static int phy_meson8_hdmi_tx_reset(struct phy *phy)
+static int phy_meson8_hdmi_tx_init(struct phy *phy)
 {
 	struct phy_meson8_hdmi_tx_priv *priv = phy_get_drvdata(phy);
 
-	regmap_write(priv->hhi, HHI_HDMI_PHY_CNTL1,
-		     HHI_HDMI_PHY_CNTL1_CLOCK_ENABLE |
-		     HHI_HDMI_PHY_CNTL1_SOFT_RESET);
-	usleep_range(1000, 2000);
+	return clk_prepare_enable(priv->tmds_clk);
+}
 
-	regmap_write(priv->hhi, HHI_HDMI_PHY_CNTL1,
-		     HHI_HDMI_PHY_CNTL1_CLOCK_ENABLE);
-	usleep_range(1000, 2000);
+static int phy_meson8_hdmi_tx_exit(struct phy *phy)
+{
+	struct phy_meson8_hdmi_tx_priv *priv = phy_get_drvdata(phy);
+
+	clk_disable_unprepare(priv->tmds_clk);
 
 	return 0;
 }
@@ -48,9 +49,10 @@ static int phy_meson8_hdmi_tx_reset(struct phy *phy)
 static int phy_meson8_hdmi_tx_power_on(struct phy *phy)
 {
 	struct phy_meson8_hdmi_tx_priv *priv = phy_get_drvdata(phy);
+	unsigned int i;
 	u16 hdmi_ctl0;
 
-	if (priv->pixel_clock == 297000)
+	if (clk_get_rate(priv->tmds_clk) >= 2970UL * 1000 * 1000)
 		hdmi_ctl0 = 0x1e8b;
 	else
 		hdmi_ctl0 = 0x4d0b;
@@ -62,9 +64,16 @@ static int phy_meson8_hdmi_tx_power_on(struct phy *phy)
 	regmap_write(priv->hhi, HHI_HDMI_PHY_CNTL1, 0x00000000);
 
 	/* Reset three times, just like the vendor driver does */
-	phy_meson8_hdmi_tx_reset(phy);
-	phy_meson8_hdmi_tx_reset(phy);
-	phy_meson8_hdmi_tx_reset(phy);
+	for (i = 0; i < 3; i++) {
+		regmap_write(priv->hhi, HHI_HDMI_PHY_CNTL1,
+			     HHI_HDMI_PHY_CNTL1_CLOCK_ENABLE |
+			     HHI_HDMI_PHY_CNTL1_SOFT_RESET);
+		usleep_range(1000, 2000);
+
+		regmap_write(priv->hhi, HHI_HDMI_PHY_CNTL1,
+			     HHI_HDMI_PHY_CNTL1_CLOCK_ENABLE);
+		usleep_range(1000, 2000);
+	}
 
 	return 0;
 }
@@ -80,23 +89,11 @@ static int phy_meson8_hdmi_tx_power_off(struct phy *phy)
 	return 0;
 }
 
-static int phy_meson8_hdmi_tx_configure(struct phy *phy,
-					union phy_configure_opts *opts)
-{
-	struct phy_meson8_hdmi_tx_priv *priv = phy_get_drvdata(phy);
-
-	if (opts->hdmi.pixel_clock > 297000)
-		return -EINVAL;
-
-	priv->pixel_clock = opts->hdmi.pixel_clock;
-
-	return 0;
-}
-
 static const struct phy_ops phy_meson8_hdmi_tx_ops = {
+	.init		= phy_meson8_hdmi_tx_init,
+	.exit		= phy_meson8_hdmi_tx_exit,
 	.power_on	= phy_meson8_hdmi_tx_power_on,
 	.power_off	= phy_meson8_hdmi_tx_power_off,
-	.configure	= phy_meson8_hdmi_tx_configure,
 	.owner		= THIS_MODULE,
 };
 
@@ -114,6 +111,10 @@ static int phy_meson8_hdmi_tx_probe(struct platform_device *pdev)
 	priv->hhi = syscon_node_to_regmap(np->parent);
 	if (IS_ERR(priv->hhi))
 		return PTR_ERR(priv->hhi);
+
+	priv->tmds_clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(priv->tmds_clk))
+		return PTR_ERR(priv->tmds_clk);
 
 	phy = devm_phy_create(&pdev->dev, np, &phy_meson8_hdmi_tx_ops);
 	if (IS_ERR(phy))

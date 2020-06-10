@@ -48,8 +48,7 @@
 #define PRG_ETH0_INVERTED_RMII_CLK	BIT(11)
 #define PRG_ETH0_TX_AND_PHY_REF_CLK	BIT(12)
 
-/*
- * Bypass (= 0, the signal from the GPIO input directly connects to the
+/* Bypass (= 0, the signal from the GPIO input directly connects to the
  * internal sampling) or enable (= 1) the internal logic for RXEN and RXD[3:0]
  * timing tuning.
  */
@@ -59,20 +58,33 @@
  * the automatically delay and skew automatically (internally).
  */
 #define PRG_ETH0_ADJ_SETUP		BIT(14)
-/*
- * An internal counter based on the "timing-adjustment" clock. The counter is
+/* An internal counter based on the "timing-adjustment" clock. The counter is
  * cleared on both, the falling and rising edge of the RX_CLK. This selects the
  * delay (= the counter value) when to start sampling RXEN and RXD[3:0].
  */
 #define PRG_ETH0_ADJ_DELAY		GENMASK(19, 15)
-/*
- * Adjusts the skew between each bit of RXEN and RXD[3:0]. If a signal has a
+/* Adjusts the skew between each bit of RXEN and RXD[3:0]. If a signal has a
  * large input delay, the bit for that signal (RXEN = bit 0, RXD[3] = bit 1,
  * ...) can be configured to be 1 to compensate for a delay of about 1ns.
  */
 #define PRG_ETH0_ADJ_SKEW		GENMASK(24, 20)
 
+#define PRG_ETH0_START_CALIBRATION	BIT(25)
+
+/* 0: falling edge, 1: rising edge */
+#define PRG_ETH0_TEST_EDGE		BIT(26)
+
+/* Select one signal t from {RXDV, RXD[3:0]} to calibrate */
+#define PRG_ETH0_SIGNAL_TO_CALIBRATE	GENMASK(29, 27)
+
 #define MUX_CLK_NUM_PARENTS		2
+
+#define PRG_ETH1			0x4
+
+/* Signal switch position in 1ns resolution */
+#define PRG_ETH1_SIGNAL_SWITCH_POSITION	GENMASK(4, 0)
+
+#define PRG_ETH1_RESULT_IS_VALID	BIT(15)
 
 struct meson8b_dwmac;
 
@@ -88,6 +100,7 @@ struct meson8b_dwmac {
 	phy_interface_t			phy_mode;
 	struct clk			*rgmii_tx_clk;
 	u32				tx_delay_ns;
+	u32				rx_delay_ns;
 	struct clk			*timing_adj_clk;
 };
 
@@ -148,6 +161,7 @@ static int meson8b_init_rgmii_tx_clk(struct meson8b_dwmac *dwmac)
 		{ .div = 5, .val = 5, },
 		{ .div = 6, .val = 6, },
 		{ .div = 7, .val = 7, },
+		{ /* end of array */ }
 	};
 
 	clk_configs = devm_kzalloc(dev, sizeof(*clk_configs), GFP_KERNEL);
@@ -291,7 +305,11 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
 
 	tx_dly_config = FIELD_PREP(PRG_ETH0_TXDLY_MASK,
 				   dwmac->tx_delay_ns >> 1);
-	rx_dly_config = PRG_ETH0_ADJ_ENABLE | PRG_ETH0_ADJ_SETUP;
+
+	if (dwmac->rx_delay_ns == 2)
+		rx_dly_config = PRG_ETH0_ADJ_ENABLE | PRG_ETH0_ADJ_SETUP;
+	else
+		rx_dly_config = 0;
 
 	switch (dwmac->phy_mode) {
 	case PHY_INTERFACE_MODE_RGMII:
@@ -305,17 +323,27 @@ static int meson8b_init_prg_eth(struct meson8b_dwmac *dwmac)
 		break;
 	case PHY_INTERFACE_MODE_RGMII_ID:
 	case PHY_INTERFACE_MODE_RMII:
-	default:
 		delay_config = 0;
 		break;
+	default:
+		dev_err(dwmac->dev, "unsupported phy-mode %s\n",
+			phy_modes(dwmac->phy_mode));
+		return -EINVAL;
 	};
 
-	if (delay_config & PRG_ETH0_ADJ_ENABLE) {
+	if (rx_dly_config & PRG_ETH0_ADJ_ENABLE) {
+		if (!dwmac->timing_adj_clk) {
+			dev_err(dwmac->dev,
+				"The timing-adjustment clock is mandatory for the RX delay re-timing\n");
+			return -EINVAL;
+		}
+
+		/* The timing adjustment logic is driven by a separate clock */
 		ret = meson8b_devm_clk_prepare_enable(dwmac,
 						      dwmac->timing_adj_clk);
 		if (ret) {
 			dev_err(dwmac->dev,
-				"failed to enable the timing adjustment clock\n");
+				"Failed to enable the timing-adjustment clock\n");
 			return ret;
 		}
 	}
@@ -407,6 +435,18 @@ static int meson8b_dwmac_probe(struct platform_device *pdev)
 	if (of_property_read_u32(pdev->dev.of_node, "amlogic,tx-delay-ns",
 				 &dwmac->tx_delay_ns))
 		dwmac->tx_delay_ns = 2;
+
+	/* use 0ns as fallback since this is what most boards actually use */
+	if (of_property_read_u32(pdev->dev.of_node, "amlogic,rx-delay-ns",
+				 &dwmac->rx_delay_ns))
+		dwmac->rx_delay_ns = 0;
+
+	if (dwmac->rx_delay_ns != 0 && dwmac->rx_delay_ns != 2) {
+		dev_err(&pdev->dev,
+			"The only allowed RX delays values are: 0ns, 2ns");
+		ret = -EINVAL;
+		goto err_remove_config_dt;
+	}
 
 	dwmac->timing_adj_clk = devm_clk_get_optional(dwmac->dev,
 						      "timing-adjustment");

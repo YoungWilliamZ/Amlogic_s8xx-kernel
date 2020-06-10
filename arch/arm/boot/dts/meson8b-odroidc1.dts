@@ -107,7 +107,6 @@
 	sound {
 		compatible = "amlogic,gx-sound-card";
 		model = "M8B-ODROID-C1";
-		audio-routing = "I2S Encoder Playback", "I2S FIFO Playback";
 
 		assigned-clocks = <&clkc CLKID_MPLL0>,
 				  <&clkc CLKID_MPLL1>;
@@ -124,14 +123,31 @@
 			mclk-fs = <256>;
 
 			codec-0 {
-				sound-dai = <&sound_dummy_codec>;
+				sound-dai = <&aiu AIU_HDMI CTRL_I2S>;
+			};
+		};
+
+		dai-link-2 {
+			sound-dai = <&aiu AIU_HDMI CTRL_OUT>;
+
+			codec-0 {
+				sound-dai = <&hdmi_tx>;
 			};
 		};
 	};
 
-	sound_dummy_codec: audio-codec-0 {
-		compatible = "ti,pcm5102a";
-		#sound-dai-cells = <0>;
+	usb0_vbus: regulator-usb0-vbus {
+		/* Richtek RT9715EGB */
+		compatible = "regulator-fixed";
+
+		regulator-name = "USB0_VBUS";
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+
+		vin-supply = <&p5v0>;
+
+		gpio = <&gpio_ao GPIOAO_5 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
 	};
 
 	vcc_1v8: regulator-vcc-1v8 {
@@ -230,11 +246,6 @@
 
 &aiu {
 	status = "okay";
-
-	pinctrl-0 = <&i2s_am_clk_pins>, <&i2s_out_ao_clk_pins>,
-		    <&i2s_out_lr_clk_pins>, <&i2s_out_ch01_ao_pins>,
-		    <&spdif_out_1_pins>;
-	pinctrl-names = "default";
 };
 
 &cpu0 {
@@ -253,10 +264,8 @@
 	pinctrl-0 = <&eth_rgmii_pins>;
 	pinctrl-names = "default";
 
-	amlogic,tx-delay-ns = <2>;
-
-	phy-mode = "rgmii";
 	phy-handle = <&eth_phy>;
+	phy-mode = "rgmii-id";
 
 	nvmem-cells = <&ethernet_mac_address>;
 	nvmem-cell-names = "mac-address";
@@ -442,10 +451,28 @@
 	pinctrl-names = "default";
 };
 
-&usb1_phy {
+&usb0 {
 	status = "okay";
+
+	dr_mode = "otg";
+	usb-role-switch;
+
+	connector {
+		compatible = "extcon-usb-b-connector", "usb-b-connector";
+		type = "micro";
+		extcon = <&usb0_phy>;
+		vbus-supply = <&usb0_vbus>;
+	};
 };
 
 &usb1 {
+	status = "okay";
+};
+
+&usb0_phy {
+	status = "okay";
+};
+
+&usb1_phy {
 	status = "okay";
 };

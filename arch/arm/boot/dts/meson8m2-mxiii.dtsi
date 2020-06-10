@@ -58,13 +58,10 @@
 		pinctrl-names = "default";
 
 		reset-gpios = <&gpio GPIOX_11 GPIO_ACTIVE_LOW>,
-			      <&gpio_ao GPIOAO_6 GPIO_ACTIVE_LOW>,
-			      <&gpio_ao GPIO_TEST_N GPIO_ACTIVE_LOW>;
+			      <&gpio_ao GPIOAO_6 GPIO_ACTIVE_LOW>;
 
 		clocks = <&xtal_32k_out>;
 		clock-names = "ext_clock";
-
-		post-power-on-delay-ms = <300>;
 	};
 
 	sound {
@@ -127,6 +124,18 @@
 				remote-endpoint = <&cvbs_vdac_out>;
 			};
 		};
+	};
+
+	usb_vbus: regulator-usb-vbus {
+		compatible = "regulator-fixed";
+
+		regulator-name = "USB_VBUS";
+
+		regulator-min-microvolt = <5000000>;
+		regulator-max-microvolt = <5000000>;
+
+		gpio = <&gpio GPIOZ_1 GPIO_ACTIVE_HIGH>;
+		enable-active-high;
 	};
 
 	vcc_3v3: regulator-vcc3v3 {
@@ -304,6 +313,16 @@
 
 &usb0 {
 	status = "okay";
+
+	dr_mode = "otg";
+	usb-role-switch;
+
+	connector {
+		compatible = "extcon-usb-b-connector", "usb-b-connector";
+		type = "micro";
+		extcon = <&usb0_phy>;
+		vbus-supply = <&usb_vbus>;
+	};
 };
 
 &usb1 {

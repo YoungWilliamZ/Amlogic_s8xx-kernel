@@ -32,11 +32,8 @@ properties:
   interrupts:
     minItems: 1
 
-  "#clock-cells":
-    const: 1
-
   clocks:
-    minItems: 9
+    minItems: 5
 
   clock-names:
     items:
@@ -45,22 +42,16 @@ properties:
       - const: clkin2
       - const: clkin3
       - const: pclk
-      - const: mod_clk
-      - const: sd_clk
-      - const: tx_clk
-      - const: rx_clk
 
 required:
   - compatible
   - reg
   - interrupts
-  - "#clock-cells"
   - clocks
   - clock-names
 
 examples:
   - |
-    #include <dt-bindings/clock/meson-mx-sdhc-clkc.h>
     #include <dt-bindings/interrupt-controller/irq.h>
     #include <dt-bindings/interrupt-controller/arm-gic.h>
 
@@ -68,16 +59,10 @@ examples:
       compatible = "amlogic,meson8-sdhc", "amlogic,meson-mx-sdhc";
       reg = <0x8e00 0x42>;
       interrupts = <GIC_SPI 78 IRQ_TYPE_EDGE_RISING>;
-      #clock-cells = <1>;
       clocks = <&xtal>,
                <&fclk_div4>,
                <&fclk_div3>,
                <&fclk_div5>,
-               <&sdhc_pclk>,
-               <&sdhc SDHC_CLKID_MOD_CLK>,
-               <&sdhc SDHC_CLKID_SD_CLK>,
-               <&sdhc SDHC_CLKID_TX_CLK>,
-               <&sdhc SDHC_CLKID_RX_CLK>;
-      clock-names = "clkin0", "clkin1", "clkin2", "clkin3", "pclk",
-                    "mod_clk", "sd_clk", "tx_clk", "rx_clk";
+               <&sdhc_pclk>;
+      clock-names = "clkin0", "clkin1", "clkin2", "clkin3", "pclk";
     };

@@ -45,13 +45,16 @@ properties:
     minItems: 11
     maxItems: 12
 
+  reset-names:
+    minItems: 11
+    maxItems: 12
+
   "#power-domain-cells":
     const: 1
 
   amlogic,ao-sysctrl:
     description: phandle to the AO sysctrl node
-    allOf:
-      - $ref: /schemas/types.yaml#/definitions/phandle
+    $ref: /schemas/types.yaml#/definitions/phandle
 
 allOf:
   - if:

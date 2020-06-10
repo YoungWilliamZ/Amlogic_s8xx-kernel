@@ -411,13 +411,6 @@ void meson_viu_gxm_disable_osd1_afbc(struct meson_drm *priv)
 			    priv->io_base + _REG(VIU_MISC_CTRL1));
 }
 
-static inline uint32_t meson_viu_osd_burst_length_reg(uint32_t length)
-{
-	uint32_t val = (((length & 0x80) % 24) / 12);
-
-	return (((val & 0x3) << 10) | (((val & 0x4) >> 2) << 31));
-}
-
 void meson_viu_init(struct meson_drm *priv)
 {
 	uint32_t reg;
@@ -438,26 +431,42 @@ void meson_viu_init(struct meson_drm *priv)
 
 	/* Initialize OSD1 fifo control register */
 	reg = VIU_OSD_DDR_PRIORITY_URGENT |
-		VIU_OSD_HOLD_FIFO_LINES(31) |
-		VIU_OSD_FIFO_DEPTH_VAL(32) | /* fifo_depth_val: 32*8=256 */
-		VIU_OSD_WORDS_PER_BURST(4) | /* 4 words in 1 burst */
-		VIU_OSD_FIFO_LIMITS(2);      /* fifo_lim: 2*16=32 */
+	      VIU_OSD_FIFO_DEPTH_VAL(32) | /* fifo_depth_val: 32*8=256 */
+	      VIU_OSD_WORDS_PER_BURST(4) | /* 4 words in 1 burst */
+	      VIU_OSD_FIFO_LIMITS(2);      /* fifo_lim: 2*16=32 */
+
+	/*
+	 * When using AFBC on newer SoCs the AFBC encoder has to be reset. To
+	 * leave time for that we need hold more lines to avoid glitches.
+	 * On the 32-bit SoCs however we need to hold fewer lines because
+	 * otherwise screen tearing can occur (for example in kmscube).
+	 */
+	if (meson_vpu_is_compatible(priv, VPU_COMPATIBLE_M8) ||
+	    meson_vpu_is_compatible(priv, VPU_COMPATIBLE_M8B) ||
+	    meson_vpu_is_compatible(priv, VPU_COMPATIBLE_M8M2))
+		reg |= VIU_OSD_HOLD_FIFO_LINES(12);
+	else
+		reg |= VIU_OSD_HOLD_FIFO_LINES(31);
 
 	if (meson_vpu_is_compatible(priv, VPU_COMPATIBLE_G12A))
-		reg |= meson_viu_osd_burst_length_reg(32);
+		reg |= VIU_OSD_BURST_LENGTH_32;
 	else
-		reg |= meson_viu_osd_burst_length_reg(64);
+		reg |= VIU_OSD_BURST_LENGTH_64;
 
 	writel_relaxed(reg, priv->io_base + _REG(VIU_OSD1_FIFO_CTRL_STAT));
 	writel_relaxed(reg, priv->io_base + _REG(VIU_OSD2_FIFO_CTRL_STAT));
 
-	/* Set OSD alpha replace value */
-	writel_bits_relaxed(0xff << OSD_REPLACE_SHIFT,
-			    0xff << OSD_REPLACE_SHIFT,
-			    priv->io_base + _REG(VIU_OSD1_CTRL_STAT2));
-	writel_bits_relaxed(0xff << OSD_REPLACE_SHIFT,
-			    0xff << OSD_REPLACE_SHIFT,
-			    priv->io_base + _REG(VIU_OSD2_CTRL_STAT2));
+	if (!meson_vpu_is_compatible(priv, VPU_COMPATIBLE_M8) &&
+	    !meson_vpu_is_compatible(priv, VPU_COMPATIBLE_M8B) &&
+	    !meson_vpu_is_compatible(priv, VPU_COMPATIBLE_M8M2)) {
+		/* Set OSD alpha replace value */
+		writel_bits_relaxed(0xff << OSD_REPLACE_SHIFT,
+				    0xff << OSD_REPLACE_SHIFT,
+				    priv->io_base + _REG(VIU_OSD1_CTRL_STAT2));
+		writel_bits_relaxed(0xff << OSD_REPLACE_SHIFT,
+				    0xff << OSD_REPLACE_SHIFT,
+				    priv->io_base + _REG(VIU_OSD2_CTRL_STAT2));
+	}
 
 	/* Disable VD1 AFBC */
 	/* di_mif0_en=0 mif0_to_vpp_en=0 di_mad_en=0 and afbc vd1 set=0*/

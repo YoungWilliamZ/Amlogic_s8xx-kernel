@@ -71,8 +71,8 @@
 		pinctrl-0 = <&xtal_32k_out_pins>;
 		pinctrl-names = "default";
 
-		reset-gpios = <&gpio_ao GPIOAO_6 GPIO_ACTIVE_HIGH>,
-			      <&gpio GPIOX_11 GPIO_ACTIVE_HIGH>;
+		reset-gpios = <&gpio_ao GPIOAO_6 GPIO_ACTIVE_LOW>,
+			      <&gpio GPIOX_11 GPIO_ACTIVE_LOW>; /* TODO: should be enable-gpios with GPIO_ACTIVE_HIGH in the card's node, this is WIFI_DISn */
 
 		clocks = <&xtal_32k_out>;
 		clock-names = "ext_clock";
@@ -222,10 +222,6 @@
 	phy-handle = <&eth_phy0>;
 	phy-mode = "rmii";
 
-	snps,reset-gpio = <&gpio GPIOZ_14 0>;
-	snps,reset-delays-us = <0 10000 1000000>;
-	snps,reset-active-low;
-
 	mdio {
 		compatible = "snps,dwmac-mdio";
 		#address-cells = <1>;
@@ -234,6 +230,10 @@
 		eth_phy0: ethernet-phy@0 {
 			/* IC Plus IP101GR (0x02430c54) */
 			reg = <0>;
+
+			reset-assert-us = <10000>;
+			reset-deassert-us = <10000>;
+			reset-gpios = <&gpio GPIOZ_14 GPIO_ACTIVE_LOW>;
 		};
 	};
 };

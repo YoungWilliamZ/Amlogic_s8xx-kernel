@@ -81,6 +81,11 @@ enum meson_pinconf_drv {
 	MESON_PINCONF_DRV_4000UA,
 };
 
+enum {
+	MESON_DIR_QUIRK_REG_SEC_DIR = 1,
+	MESON_DIR_QUIRK_OUTPUT_ONLY = 2,
+};
+
 /**
  * struct meson bank
  *
@@ -88,6 +93,7 @@ enum meson_pinconf_drv {
  * @first:	first pin of the bank
  * @last:	last pin of the bank
  * @irq:	hwirq base number of the bank
+ * @dir_quirks:	Special quirks for the direction registers
  * @regs:	array of register descriptors
  *
  * A bank represents a set of pins controlled by a contiguous set of
@@ -101,6 +107,7 @@ struct meson_bank {
 	unsigned int last;
 	int irq_first;
 	int irq_last;
+	u8 dir_quirks;
 	struct meson_reg_desc regs[NUM_REG];
 };
 
@@ -129,6 +136,7 @@ struct meson_pinctrl {
 	struct regmap *reg_pull;
 	struct regmap *reg_gpio;
 	struct regmap *reg_ds;
+	struct regmap *reg_sec_dir;
 	struct gpio_chip chip;
 	struct device_node *of_node;
 };
@@ -140,14 +148,15 @@ struct meson_pinctrl {
 		.num_groups = ARRAY_SIZE(fn ## _groups),		\
 	}
 
-#define BANK_DS(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib,     \
-		dsr, dsb)                                                      \
+#define _BANK(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib,     \
+		dsr, dsb, dq)                                                \
 	{								\
 		.name		= n,					\
 		.first		= f,					\
 		.last		= l,					\
 		.irq_first	= fi,					\
 		.irq_last	= li,					\
+		.dir_quirks	= dq,					\
 		.regs = {						\
 			[REG_PULLEN]	= { per, peb },			\
 			[REG_PULL]	= { pr, pb },			\
@@ -157,9 +166,15 @@ struct meson_pinctrl {
 			[REG_DS]	= { dsr, dsb },			\
 		},							\
 	 }
+#define BANK_DS(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib,     \
+		dsr, dsb)                                                      \
+	_BANK(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib, dsr, dsb, 0)
 
 #define BANK(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib) \
 	BANK_DS(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib, 0, 0)
+
+#define BANK_DIR_QUIRK(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib, dq) \
+	_BANK(n, f, l, fi, li, per, peb, pr, pb, dr, db, or, ob, ir, ib, 0, 0, dq)
 
 #define MESON_PIN(x) PINCTRL_PIN(x, #x)
 
@@ -174,7 +189,9 @@ int meson_pmx_get_groups(struct pinctrl_dev *pcdev,
 
 /* Common probe function */
 int meson_pinctrl_probe(struct platform_device *pdev);
-/* Common ao groups extra dt parse function for SoCs before g12a  */
-int meson8_aobus_parse_dt_extra(struct meson_pinctrl *pc);
+/* Use reg_pullen for reg_pull, typically used for AOBUS before G12A */
+int meson_pinctrl_alias_reg_pullen_pull(struct meson_pinctrl *pc);
+/* Meson8, Meson8b and Meson8m2 specific DT initialization */
+int meson8_aobus_parse_dt(struct meson_pinctrl *pc);
 /* Common extra dt parse function for SoCs like A1  */
 int meson_a1_parse_dt_extra(struct meson_pinctrl *pc);

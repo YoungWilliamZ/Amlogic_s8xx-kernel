@@ -10,6 +10,7 @@
 #include <linux/xattr.h>
 #include <linux/posix_acl.h>
 #include <linux/ratelimit.h>
+#include <linux/fiemap.h>
 #include "overlayfs.h"
 
 
@@ -57,6 +58,24 @@ int ovl_setattr(struct dentry *dentry, struct iattr *attr)
 
 		if (attr->ia_valid & (ATTR_KILL_SUID|ATTR_KILL_SGID))
 			attr->ia_valid &= ~ATTR_MODE;
+
+		/*
+		 * We might have to translate ovl file into real file object
+		 * once use cases emerge.  For now, simply don't let underlying
+		 * filesystem rely on attr->ia_file
+		 */
+		attr->ia_valid &= ~ATTR_FILE;
+
+		/*
+		 * If open(O_TRUNC) is done, VFS calls ->setattr with ATTR_OPEN
+		 * set.  Overlayfs does not pass O_TRUNC flag to underlying
+		 * filesystem during open -> do not pass ATTR_OPEN.  This
+		 * disables optimization in fuse which assumes open(O_TRUNC)
+		 * already set file size to 0.  But we never passed O_TRUNC to
+		 * fuse.  So by clearing ATTR_OPEN, fuse will be forced to send
+		 * setattr request to server.
+		 */
+		attr->ia_valid &= ~ATTR_OPEN;
 
 		inode_lock(upperdentry->d_inode);
 		old_cred = ovl_override_creds(dentry->d_sb);
@@ -461,10 +480,6 @@ static int ovl_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 		return -EOPNOTSUPP;
 
 	old_cred = ovl_override_creds(inode->i_sb);
-
-	if (fieinfo->fi_flags & FIEMAP_FLAG_SYNC)
-		filemap_write_and_wait(realinode->i_mapping);
-
 	err = realinode->i_op->fiemap(realinode, fieinfo, start, len);
 	revert_creds(old_cred);
 

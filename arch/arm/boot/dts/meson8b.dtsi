@@ -6,7 +6,6 @@
 
 #include <dt-bindings/clock/meson8-ddr-clkc.h>
 #include <dt-bindings/clock/meson8b-clkc.h>
-#include <dt-bindings/clock/meson-mx-sdhc-clkc.h>
 #include <dt-bindings/gpio/meson8b-gpio.h>
 #include <dt-bindings/power/meson8-power.h>
 #include <dt-bindings/reset/amlogic,meson8b-reset.h>
@@ -318,6 +317,8 @@
 			clocks = <&clkc CLKID_HDMI_PCLK>,
 				 <&clkc CLKID_HDMI_SYS>;
 			clock-names = "pclk", "sys";
+			sound-name-prefix = "HDMITX";
+			#sound-dai-cells = <0>;
 			#address-cells = <1>;
 			#size-cells = <0>;
 			status = "disabled";
@@ -391,28 +392,6 @@
 			nvmem-cells = <&cvbs_trimming>;
 			nvmem-cell-names = "cvbs_trimming";
 
-			assigned-clocks = <&clkc CLKID_HDMI_PLL_DCO>,
-					  <&clkc CLKID_HDMI_PLL_LVDS_OUT>,
-					  <&clkc CLKID_HDMI_PLL_HDMI_OUT>,
-					  <&clkc CLKID_PLL_VID>,
-					  <&clkc CLKID_VID_PLL_FINAL_DIV>,
-					  <&clkc CLKID_HDMI_TX_PIXEL>,
-					  <&clkc CLKID_CTS_ENCP>,
-					  <&clkc CLKID_CTS_ENCI>,
-					  <&clkc CLKID_CTS_ENCT>,
-					  <&clkc CLKID_CTS_ENCL>,
-					  <&clkc CLKID_CTS_VDAC0>;
-			assigned-clock-rates = <1296000000>, /* CLKID_HDMI_PLL_DCO */
-					       <1296000000>, /* CLKID_HDMI_PLL_LVDS_OUT */
-						<324000000>, /* CLKID_HDMI_PLL_HDMI_OUT */
-						<216000000>, /* CLKID_PLL_VID */
-						 <54000000>, /* CLKID_VID_PLL_FINAL_DIV */
-						 <27000000>, /* CLKID_HDMI_TX_PIXEL */
-						 <54000000>, /* CLKID_CTS_ENCP */
-						 <27000000>, /* CLKID_CTS_ENCI */
-						 <54000000>, /* CLKID_CTS_ENCT */
-						 <54000000>, /* CLKID_CTS_ENCL */
-						 <27000000>; /* CLKID_CTS_VDAC0 */
 
 			#address-cells = <1>;
 			#size-cells = <0>;
@@ -443,6 +422,7 @@
 	pinctrl_aobus: pinctrl@84 {
 		compatible = "amlogic,meson8b-aobus-pinctrl";
 		reg = <0x84 0xc>;
+		amlogic,secbus2 = <&secbus2>;
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges;
@@ -778,6 +758,7 @@
 
 	hdmi_tx_phy: phy {
 		compatible = "amlogic,meson8b-hdmi-tx-phy";
+		clocks = <&clkc CLKID_HDMI_PLL_HDMI_OUT>;
 		#phy-cells = <0>;
 	};
 
@@ -888,13 +869,8 @@
 		 <&clkc CLKID_FCLK_DIV4>,
 		 <&clkc CLKID_FCLK_DIV3>,
 		 <&clkc CLKID_FCLK_DIV5>,
-		 <&clkc CLKID_SDHC>,
-		 <&sdhc SDHC_CLKID_MOD_CLK>,
-		 <&sdhc SDHC_CLKID_SD_CLK>,
-		 <&sdhc SDHC_CLKID_TX_CLK>,
-		 <&sdhc SDHC_CLKID_RX_CLK>;
-	clock-names = "clkin0", "clkin1", "clkin2", "clkin3", "pclk",
-		      "mod_clk", "sd_clk", "tx_clk", "rx_clk";
+		 <&clkc CLKID_SDHC>;
+	clock-names = "clkin0", "clkin1", "clkin2", "clkin3", "pclk";
 };
 
 &sdio {

@@ -130,7 +130,7 @@ struct intel_uncore_box {
 	struct list_head list;
 	struct list_head active_list;
 	void __iomem *io_addr;
-	struct intel_uncore_extra_reg shared_regs[0];
+	struct intel_uncore_extra_reg shared_regs[];
 };
 
 /* CFL uncore 8th cbox MSRs */
@@ -550,6 +550,9 @@ void skx_uncore_cpu_init(void);
 int snr_uncore_pci_init(void);
 void snr_uncore_cpu_init(void);
 void snr_uncore_mmio_init(void);
+int icx_uncore_pci_init(void);
+void icx_uncore_cpu_init(void);
+void icx_uncore_mmio_init(void);
 
 /* uncore_nhmex.c */
 void nhmex_uncore_cpu_init(void);

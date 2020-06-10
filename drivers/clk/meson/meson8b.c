@@ -18,6 +18,7 @@
 
 #include "meson8b.h"
 #include "clk-regmap.h"
+#include "clk-phase.h"
 #include "clk-pll.h"
 #include "clk-mpll.h"
 
@@ -1963,6 +1964,13 @@ static struct clk_regmap meson8b_mali = {
 	},
 };
 
+static const struct reg_sequence meson8m2_gp_pll_init_regs[] = {
+	{ .reg = HHI_GP_PLL_CNTL2,	.def = 0x59c88000 },
+	{ .reg = HHI_GP_PLL_CNTL3,	.def = 0xca463823 },
+	{ .reg = HHI_GP_PLL_CNTL4,	.def = 0x0286a027 },
+	{ .reg = HHI_GP_PLL_CNTL5,	.def = 0x00003000 },
+};
+
 static const struct pll_params_table meson8m2_gp_pll_params_table[] = {
 	PLL_PARAMS(182, 3),
 	{ /* sentinel */ },
@@ -1996,6 +2004,8 @@ static struct clk_regmap meson8m2_gp_pll_dco = {
 			.width   = 1,
 		},
 		.table = meson8m2_gp_pll_params_table,
+		.init_regs = meson8m2_gp_pll_init_regs,
+		.init_count = ARRAY_SIZE(meson8m2_gp_pll_init_regs),
 	},
 	.hw.init = &(struct clk_init_data){
 		.name = "gp_pll_dco",
@@ -2490,25 +2500,28 @@ static struct clk_regmap meson8b_vdec_hevc = {
 	},
 };
 
-static const struct clk_parent_data meson8b_cts_amclk_parent_data[] = {
-	{ .fw_name = "ddr_pll", },
-	{ .hw = &meson8b_mpll0.hw, },
-	{ .hw = &meson8b_mpll1.hw, },
-	{ .hw = &meson8b_mpll2.hw, },
+/* TODO: the clock at index 0 is "DDR_PLL" which we don't support yet */
+static const struct clk_hw *meson8b_cts_amclk_parent_hws[] = {
+	&meson8b_mpll0.hw,
+	&meson8b_mpll1.hw,
+	&meson8b_mpll2.hw
 };
+
+static u32 meson8b_cts_amclk_mux_table[] = { 1, 2, 3 };
 
 static struct clk_regmap meson8b_cts_amclk_sel = {
 	.data = &(struct clk_regmap_mux_data){
 		.offset = HHI_AUD_CLK_CNTL,
 		.mask = 0x3,
 		.shift = 9,
+		.table = meson8b_cts_amclk_mux_table,
 		.flags = CLK_MUX_ROUND_CLOSEST,
 	},
 	.hw.init = &(struct clk_init_data){
 		.name = "cts_amclk_sel",
 		.ops = &clk_regmap_mux_ops,
-		.parent_data = meson8b_cts_amclk_parent_data,
-		.num_parents = ARRAY_SIZE(meson8b_cts_amclk_parent_data),
+		.parent_hws = meson8b_cts_amclk_parent_hws,
+		.num_parents = ARRAY_SIZE(meson8b_cts_amclk_parent_hws),
 	},
 };
 
@@ -2546,25 +2559,28 @@ static struct clk_regmap meson8b_cts_amclk = {
 	},
 };
 
-static const struct clk_parent_data meson8b_cts_mclk_i958_parent_data[] = {
-	{ .fw_name = "ddr_pll", },
-	{ .hw = &meson8b_mpll0.hw, },
-	{ .hw = &meson8b_mpll1.hw, },
-	{ .hw = &meson8b_mpll2.hw, },
+/* TODO: the clock at index 0 is "DDR_PLL" which we don't support yet */
+static const struct clk_hw *meson8b_cts_mclk_i958_parent_hws[] = {
+	&meson8b_mpll0.hw,
+	&meson8b_mpll1.hw,
+	&meson8b_mpll2.hw
 };
+
+static u32 meson8b_cts_mclk_i958_mux_table[] = { 1, 2, 3 };
 
 static struct clk_regmap meson8b_cts_mclk_i958_sel = {
 	.data = &(struct clk_regmap_mux_data){
 		.offset = HHI_AUD_CLK_CNTL2,
 		.mask = 0x3,
 		.shift = 25,
+		.table = meson8b_cts_mclk_i958_mux_table,
 		.flags = CLK_MUX_ROUND_CLOSEST,
 	},
 	.hw.init = &(struct clk_init_data) {
 		.name = "cts_mclk_i958_sel",
 		.ops = &clk_regmap_mux_ops,
-		.parent_data = meson8b_cts_mclk_i958_parent_data,
-		.num_parents = ARRAY_SIZE(meson8b_cts_mclk_i958_parent_data),
+		.parent_hws = meson8b_cts_mclk_i958_parent_hws,
+		.num_parents = ARRAY_SIZE(meson8b_cts_mclk_i958_parent_hws),
 	},
 };
 
@@ -2621,6 +2637,78 @@ static struct clk_regmap meson8b_cts_i958 = {
 		 * consumer choose the appropriate parent.
 		 */
 		.flags = CLK_SET_RATE_PARENT | CLK_SET_RATE_NO_REPARENT,
+	},
+};
+
+static u32 meson8_eth_clk_mux_table[] = { 7 };
+
+static struct clk_regmap meson8_eth_clk_sel = {
+	.data = &(struct clk_regmap_mux_data) {
+		.offset = HHI_ETH_CLK_CNTL,
+		.mask = 0x7,
+		.shift = 9,
+		.table = meson8_eth_clk_mux_table,
+	},
+	.hw.init = &(struct clk_init_data) {
+		.name = "eth_clk_sel",
+		.ops = &clk_regmap_mux_ops,
+		.parent_data = &(const struct clk_parent_data) {
+			/* TODO: all other parents are unknown */
+			.fw_name = "rmii_clk",
+		},
+		.num_parents = 1,
+	},
+};
+
+static struct clk_regmap meson8_eth_clk_div = {
+	.data = &(struct clk_regmap_div_data) {
+		.offset = HHI_ETH_CLK_CNTL,
+		.shift = 0,
+		.width = 8,
+	},
+	.hw.init = &(struct clk_init_data) {
+		.name = "eth_clk_div",
+		.ops = &clk_regmap_divider_ops,
+		.parent_hws = (const struct clk_hw *[]) {
+			&meson8_eth_clk_sel.hw
+		},
+		.num_parents = 1,
+		.flags = CLK_SET_RATE_PARENT,
+	},
+};
+
+static struct clk_regmap meson8_eth_clk_phase = {
+	.data = &(struct meson_clk_phase_data) {
+		.ph = {
+			.reg_off = HHI_ETH_CLK_CNTL,
+			.shift = 14,
+			.width = 1,
+		},
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "eth_clk_inverted",
+		.ops = &meson_clk_phase_ops,
+		.parent_hws = (const struct clk_hw *[]) {
+			&meson8_eth_clk_div.hw
+		},
+		.num_parents = 1,
+		.flags = CLK_SET_RATE_PARENT,
+	},
+};
+
+static struct clk_regmap meson8_eth_clk_gate = {
+	.data = &(struct clk_regmap_gate_data) {
+		.offset = HHI_ETH_CLK_CNTL,
+		.bit_idx = 8,
+	},
+	.hw.init = &(struct clk_init_data){
+		.name = "eth_clk_en",
+		.ops = &clk_regmap_gate_ops,
+		.parent_hws = (const struct clk_hw *[]) {
+			&meson8_eth_clk_phase.hw
+		},
+		.num_parents = 1,
+		.flags = CLK_SET_RATE_PARENT,
 	},
 };
 
@@ -2918,6 +3006,10 @@ static struct clk_hw_onecell_data meson8_hw_onecell_data = {
 		[CLKID_CTS_MCLK_I958_DIV]   = &meson8b_cts_mclk_i958_div.hw,
 		[CLKID_CTS_MCLK_I958]	    = &meson8b_cts_mclk_i958.hw,
 		[CLKID_CTS_I958]	    = &meson8b_cts_i958.hw,
+		[CLKID_ETH_CLK_SEL]	    = &meson8_eth_clk_sel.hw,
+		[CLKID_ETH_CLK_DIV]	    = &meson8_eth_clk_div.hw,
+		[CLKID_ETH_CLK_PHASE]	    = &meson8_eth_clk_phase.hw,
+		[CLKID_ETH_CLK]		    = &meson8_eth_clk_gate.hw,
 		[CLK_NR_CLKS]		    = NULL,
 	},
 	.num = CLK_NR_CLKS,
@@ -3548,6 +3640,10 @@ static struct clk_regmap *const meson8b_clk_regmaps[] = {
 	&meson8b_cts_mclk_i958_div,
 	&meson8b_cts_mclk_i958,
 	&meson8b_cts_i958,
+	&meson8_eth_clk_sel,
+	&meson8_eth_clk_div,
+	&meson8_eth_clk_phase,
+	&meson8_eth_clk_gate,
 };
 
 static const struct meson8b_clk_reset_line {
@@ -3643,17 +3739,15 @@ static int meson8b_clk_reset_update(struct reset_controller_dev *rcdev,
 	struct meson8b_clk_reset *meson8b_clk_reset =
 		container_of(rcdev, struct meson8b_clk_reset, reset);
 	const struct meson8b_clk_reset_line *reset;
+	unsigned int value = 0;
 	unsigned long flags;
-	unsigned int value;
 
 	if (id >= ARRAY_SIZE(meson8b_clk_reset_bits))
 		return -EINVAL;
 
 	reset = &meson8b_clk_reset_bits[id];
 
-	if (assert == reset->active_low)
-		value = 0;
-	else
+	if (assert != reset->active_low)
 		value = BIT(reset->bit_idx);
 
 	spin_lock_irqsave(&meson_clk_lock, flags);

@@ -20,6 +20,10 @@
  * [0] http://dn.odroid.com/S805/Datasheet/S805_Datasheet%20V0.8%2020150126.pdf
  */
 #define HHI_GP_PLL_CNTL			0x40  /* 0x10 offset in data sheet */
+#define HHI_GP_PLL_CNTL2		0x44  /* 0x11 offset in data sheet */
+#define HHI_GP_PLL_CNTL3		0x48  /* 0x12 offset in data sheet */
+#define HHI_GP_PLL_CNTL4		0x4C  /* 0x13 offset in data sheet */
+#define HHI_GP_PLL_CNTL5		0x50  /* 0x14 offset in data sheet */
 #define HHI_VIID_CLK_DIV		0x128 /* 0x4a offset in data sheet */
 #define HHI_VIID_CLK_CNTL		0x12c /* 0x4b offset in data sheet */
 #define HHI_GCLK_MPEG0			0x140 /* 0x50 offset in data sheet */
@@ -39,6 +43,7 @@
 #define HHI_MALI_CLK_CNTL		0x1b0 /* 0x6c offset in data sheet */
 #define HHI_VPU_CLK_CNTL		0x1bc /* 0x6f offset in data sheet */
 #define HHI_HDMI_CLK_CNTL		0x1cc /* 0x73 offset in data sheet */
+#define HHI_ETH_CLK_CNTL		0x1d8 /* 0x76 offset in data sheet */
 #define HHI_VDEC_CLK_CNTL		0x1e0 /* 0x78 offset in data sheet */
 #define HHI_VDEC2_CLK_CNTL		0x1e4 /* 0x79 offset in data sheet */
 #define HHI_VDEC3_CLK_CNTL		0x1e8 /* 0x7a offset in data sheet */
@@ -176,8 +181,11 @@
 #define CLKID_CTS_AMCLK_DIV	208
 #define CLKID_CTS_MCLK_I958_SEL	210
 #define CLKID_CTS_MCLK_I958_DIV	211
+#define CLKID_ETH_CLK_SEL	214
+#define CLKID_ETH_CLK_DIV	215
+#define CLKID_ETH_CLK_PHASE	216
 
-#define CLK_NR_CLKS		214
+#define CLK_NR_CLKS		218
 
 /*
  * include the CLKID and RESETID that have

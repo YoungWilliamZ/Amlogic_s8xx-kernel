@@ -181,9 +181,17 @@ static int meson_pinconf_set_gpio_bit(struct meson_pinctrl *pc,
 	if (ret)
 		return ret;
 
+	if (reg_type == REG_DIR && bank->dir_quirks & MESON_DIR_QUIRK_OUTPUT_ONLY && arg)
+		return -EINVAL;
+
 	meson_calc_reg_and_bit(bank, pin, reg_type, &reg, &bit);
-	return regmap_update_bits(pc->reg_gpio, reg, BIT(bit),
-				  arg ? BIT(bit) : 0);
+
+	if (reg_type == REG_DIR && bank->dir_quirks & MESON_DIR_QUIRK_REG_SEC_DIR)
+		return regmap_update_bits(pc->reg_sec_dir, reg, BIT(bit),
+					  arg ? 0 : BIT(bit));
+	else
+		return regmap_update_bits(pc->reg_gpio, reg, BIT(bit),
+					  arg ? BIT(bit) : 0);
 }
 
 static int meson_pinconf_get_gpio_bit(struct meson_pinctrl *pc,
@@ -192,6 +200,7 @@ static int meson_pinconf_get_gpio_bit(struct meson_pinctrl *pc,
 {
 	struct meson_bank *bank;
 	unsigned int reg, bit, val;
+	struct regmap *regmap;
 	int ret;
 
 	ret = meson_get_bank(pc, pin, &bank);
@@ -199,11 +208,27 @@ static int meson_pinconf_get_gpio_bit(struct meson_pinctrl *pc,
 		return ret;
 
 	meson_calc_reg_and_bit(bank, pin, reg_type, &reg, &bit);
-	ret = regmap_read(pc->reg_gpio, reg, &val);
+
+	if (reg_type == REG_DIR && bank->dir_quirks & MESON_DIR_QUIRK_OUTPUT_ONLY)
+		return 1;
+
+	if (reg_type == REG_DIR && bank->dir_quirks & MESON_DIR_QUIRK_REG_SEC_DIR)
+		regmap = pc->reg_sec_dir;
+	else
+		regmap = pc->reg_gpio;
+
+	if (!regmap)
+		return -EINVAL;
+
+	ret = regmap_read(regmap, reg, &val);
 	if (ret)
 		return ret;
 
-	return BIT(bit) & val ? 1 : 0;
+	ret = BIT(bit) & val ? 1 : 0;
+	if (reg_type == REG_DIR && bank->dir_quirks & MESON_DIR_QUIRK_REG_SEC_DIR)
+		reg = !reg;
+
+	return reg;
 }
 
 static int meson_pinconf_set_output(struct meson_pinctrl *pc,
@@ -711,7 +736,7 @@ static int meson_pinctrl_parse_dt(struct meson_pinctrl *pc,
 	return 0;
 }
 
-int meson8_aobus_parse_dt_extra(struct meson_pinctrl *pc)
+int meson_pinctrl_alias_reg_pullen_pull(struct meson_pinctrl *pc)
 {
 	if (!pc->reg_pull)
 		return -EINVAL;
@@ -719,6 +744,32 @@ int meson8_aobus_parse_dt_extra(struct meson_pinctrl *pc)
 	pc->reg_pullen = pc->reg_pull;
 
 	return 0;
+}
+
+int meson8_aobus_parse_dt(struct meson_pinctrl *pc)
+{
+	struct platform_device *secbus2_pdev;
+	struct device_node *secbus2_np;
+
+	secbus2_np = of_parse_phandle(pc->dev->of_node, "amlogic,secbus2", 0);
+	if (secbus2_np) {
+		secbus2_pdev = of_find_device_by_node(secbus2_np);
+		if (!secbus2_pdev)
+			goto err_defer_put_secbus2_np;
+
+		pc->reg_sec_dir = dev_get_regmap(&secbus2_pdev->dev, NULL);
+		if (!pc->reg_sec_dir)
+			goto err_defer_put_secbus2_np;
+	} else {
+		dev_warn(pc->dev,
+			 "amlogic,secbus2 is missing, GPIO_TEST_N direction won't work\n");
+	}
+
+	return meson_pinctrl_alias_reg_pullen_pull(pc);
+
+err_defer_put_secbus2_np:
+	of_node_put(secbus2_np);
+	return -EPROBE_DEFER;
 }
 
 int meson_a1_parse_dt_extra(struct meson_pinctrl *pc)

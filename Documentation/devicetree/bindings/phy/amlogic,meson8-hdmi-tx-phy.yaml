@@ -25,6 +25,11 @@ properties:
       - amlogic,meson8b-hdmi-tx-phy
       - amlogic,meson8m2-hdmi-tx-phy
 
+  clocks:
+    minItems: 1
+    description:
+      HDMI TMDS clock
+
   "#phy-cells":
     const: 0
 
@@ -36,5 +41,6 @@ examples:
   - |
     hdmi_tx_phy: phy {
       compatible = "amlogic,meson8-hdmi-tx-phy";
+      clocks = <&tmds_clock>;
       #phy-cells = <0>;
     };

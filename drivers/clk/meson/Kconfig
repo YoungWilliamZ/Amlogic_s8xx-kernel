@@ -45,6 +45,7 @@ config COMMON_CLK_MESON8B
 	depends on ARCH_MESON
 	select COMMON_CLK_MESON_REGMAP
 	select COMMON_CLK_MESON_MPLL
+	select COMMON_CLK_MESON_PHASE
 	select COMMON_CLK_MESON_PLL
 	select MFD_SYSCON
 	select RESET_CONTROLLER
@@ -52,15 +53,6 @@ config COMMON_CLK_MESON8B
 	  Support for the clock controller on AmLogic S802 (Meson8),
 	  S805 (Meson8b) and S812 (Meson8m2) devices. Say Y if you
 	  want peripherals and CPU frequency scaling to work.
-
-config COMMON_CLK_MESON_MX_SDHC
-	tristate "Meson MX SDHC MMC Clock Controller Driver"
-	depends on ARCH_MESON
-	select COMMON_CLK_MESON_REGMAP
-	help
-	  Support for the SDHC clock controller on Amlogic Meson8/8b/8m2 SoCs
-	  devices. Say Y or M if you want to use the SDHC MMC controller.
-	  Otherwise say N.
 
 config COMMON_CLK_GXBB
 	bool

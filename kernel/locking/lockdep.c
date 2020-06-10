@@ -393,25 +393,6 @@ void lockdep_init_task(struct task_struct *task)
 	task->lockdep_recursion = 0;
 }
 
-/*
- * Split the recrursion counter in two to readily detect 'off' vs recursion.
- */
-#define LOCKDEP_RECURSION_BITS	16
-#define LOCKDEP_OFF		(1U << LOCKDEP_RECURSION_BITS)
-#define LOCKDEP_RECURSION_MASK	(LOCKDEP_OFF - 1)
-
-void lockdep_off(void)
-{
-	current->lockdep_recursion += LOCKDEP_OFF;
-}
-EXPORT_SYMBOL(lockdep_off);
-
-void lockdep_on(void)
-{
-	current->lockdep_recursion -= LOCKDEP_OFF;
-}
-EXPORT_SYMBOL(lockdep_on);
-
 static inline void lockdep_recursion_finish(void)
 {
 	if (WARN_ON_ONCE(--current->lockdep_recursion))
@@ -489,7 +470,7 @@ struct lock_trace {
 	struct hlist_node	hash_entry;
 	u32			hash;
 	u32			nr_entries;
-	unsigned long		entries[0] __aligned(sizeof(unsigned long));
+	unsigned long		entries[] __aligned(sizeof(unsigned long));
 };
 #define LOCK_TRACE_SIZE_IN_LONGS				\
 	(sizeof(struct lock_trace) / sizeof(unsigned long))
@@ -3635,12 +3616,9 @@ mark_held_locks(struct task_struct *curr, enum lock_usage_bit base_bit)
 /*
  * Hardirqs will be enabled:
  */
-static void __trace_hardirqs_on_caller(unsigned long ip)
+static void __trace_hardirqs_on_caller(void)
 {
 	struct task_struct *curr = current;
-
-	/* we'll do an OFF -> ON transition: */
-	curr->hardirqs_enabled = 1;
 
 	/*
 	 * We are going to turn hardirqs on, so set the
@@ -3654,15 +3632,19 @@ static void __trace_hardirqs_on_caller(unsigned long ip)
 	 * this bit from being set before)
 	 */
 	if (curr->softirqs_enabled)
-		if (!mark_held_locks(curr, LOCK_ENABLED_SOFTIRQ))
-			return;
-
-	curr->hardirq_enable_ip = ip;
-	curr->hardirq_enable_event = ++curr->irq_events;
-	debug_atomic_inc(hardirqs_on_events);
+		mark_held_locks(curr, LOCK_ENABLED_SOFTIRQ);
 }
 
-void lockdep_hardirqs_on(unsigned long ip)
+/**
+ * lockdep_hardirqs_on_prepare - Prepare for enabling interrupts
+ * @ip:		Caller address
+ *
+ * Invoked before a possible transition to RCU idle from exit to user or
+ * guest mode. This ensures that all RCU operations are done before RCU
+ * stops watching. After the RCU transition lockdep_hardirqs_on() has to be
+ * invoked to set the final state.
+ */
+void lockdep_hardirqs_on_prepare(unsigned long ip)
 {
 	if (unlikely(!debug_locks || current->lockdep_recursion))
 		return;
@@ -3698,20 +3680,62 @@ void lockdep_hardirqs_on(unsigned long ip)
 	if (DEBUG_LOCKS_WARN_ON(current->hardirq_context))
 		return;
 
+	current->hardirq_chain_key = current->curr_chain_key;
+
 	current->lockdep_recursion++;
-	__trace_hardirqs_on_caller(ip);
+	__trace_hardirqs_on_caller();
 	lockdep_recursion_finish();
 }
-NOKPROBE_SYMBOL(lockdep_hardirqs_on);
+EXPORT_SYMBOL_GPL(lockdep_hardirqs_on_prepare);
+
+void noinstr lockdep_hardirqs_on(unsigned long ip)
+{
+	struct task_struct *curr = current;
+
+	if (unlikely(!debug_locks || curr->lockdep_recursion))
+		return;
+
+	if (curr->hardirqs_enabled) {
+		/*
+		 * Neither irq nor preemption are disabled here
+		 * so this is racy by nature but losing one hit
+		 * in a stat is not a big deal.
+		 */
+		__debug_atomic_inc(redundant_hardirqs_on);
+		return;
+	}
+
+	/*
+	 * We're enabling irqs and according to our state above irqs weren't
+	 * already enabled, yet we find the hardware thinks they are in fact
+	 * enabled.. someone messed up their IRQ state tracing.
+	 */
+	if (DEBUG_LOCKS_WARN_ON(!irqs_disabled()))
+		return;
+
+	/*
+	 * Ensure the lock stack remained unchanged between
+	 * lockdep_hardirqs_on_prepare() and lockdep_hardirqs_on().
+	 */
+	DEBUG_LOCKS_WARN_ON(current->hardirq_chain_key !=
+			    current->curr_chain_key);
+
+	/* we'll do an OFF -> ON transition: */
+	curr->hardirqs_enabled = 1;
+	curr->hardirq_enable_ip = ip;
+	curr->hardirq_enable_event = ++curr->irq_events;
+	debug_atomic_inc(hardirqs_on_events);
+}
+EXPORT_SYMBOL_GPL(lockdep_hardirqs_on);
 
 /*
  * Hardirqs were disabled:
  */
-void lockdep_hardirqs_off(unsigned long ip)
+void noinstr lockdep_hardirqs_off(unsigned long ip)
 {
 	struct task_struct *curr = current;
 
-	if (unlikely(!debug_locks || current->lockdep_recursion))
+	if (unlikely(!debug_locks || curr->lockdep_recursion))
 		return;
 
 	/*
@@ -3729,10 +3753,11 @@ void lockdep_hardirqs_off(unsigned long ip)
 		curr->hardirq_disable_ip = ip;
 		curr->hardirq_disable_event = ++curr->irq_events;
 		debug_atomic_inc(hardirqs_off_events);
-	} else
+	} else {
 		debug_atomic_inc(redundant_hardirqs_off);
+	}
 }
-NOKPROBE_SYMBOL(lockdep_hardirqs_off);
+EXPORT_SYMBOL_GPL(lockdep_hardirqs_off);
 
 /*
  * Softirqs will be enabled:
@@ -3952,10 +3977,36 @@ static int mark_lock(struct task_struct *curr, struct held_lock *this,
 	return ret;
 }
 
+static inline short task_wait_context(struct task_struct *curr)
+{
+	/*
+	 * Set appropriate wait type for the context; for IRQs we have to take
+	 * into account force_irqthread as that is implied by PREEMPT_RT.
+	 */
+	if (curr->hardirq_context) {
+		/*
+		 * Check if force_irqthreads will run us threaded.
+		 */
+		if (curr->hardirq_threaded || curr->irq_config)
+			return LD_WAIT_CONFIG;
+
+		return LD_WAIT_SPIN;
+	} else if (curr->softirq_context) {
+		/*
+		 * Softirqs are always threaded.
+		 */
+		return LD_WAIT_CONFIG;
+	}
+
+	return LD_WAIT_MAX;
+}
+
 static int
 print_lock_invalid_wait_context(struct task_struct *curr,
 				struct held_lock *hlock)
 {
+	short curr_inner;
+
 	if (!debug_locks_off())
 		return 0;
 	if (debug_locks_silent)
@@ -3971,6 +4022,10 @@ print_lock_invalid_wait_context(struct task_struct *curr,
 	print_lock(hlock);
 
 	pr_warn("other info that might help us debug this:\n");
+
+	curr_inner = task_wait_context(curr);
+	pr_warn("context-{%d:%d}\n", curr_inner, curr_inner);
+
 	lockdep_print_held_locks(curr);
 
 	pr_warn("stack backtrace:\n");
@@ -4017,26 +4072,7 @@ static int check_wait_context(struct task_struct *curr, struct held_lock *next)
 	}
 	depth++;
 
-	/*
-	 * Set appropriate wait type for the context; for IRQs we have to take
-	 * into account force_irqthread as that is implied by PREEMPT_RT.
-	 */
-	if (curr->hardirq_context) {
-		/*
-		 * Check if force_irqthreads will run us threaded.
-		 */
-		if (curr->hardirq_threaded || curr->irq_config)
-			curr_inner = LD_WAIT_CONFIG;
-		else
-			curr_inner = LD_WAIT_SPIN;
-	} else if (curr->softirq_context) {
-		/*
-		 * Softirqs are always threaded.
-		 */
-		curr_inner = LD_WAIT_CONFIG;
-	} else {
-		curr_inner = LD_WAIT_MAX;
-	}
+	curr_inner = task_wait_context(curr);
 
 	for (; depth < curr->lockdep_depth; depth++) {
 		struct held_lock *prev = curr->held_locks + depth;
@@ -4397,8 +4433,8 @@ static void print_unlock_imbalance_bug(struct task_struct *curr,
 	dump_stack();
 }
 
-static int match_held_lock(const struct held_lock *hlock,
-					const struct lockdep_map *lock)
+static noinstr int match_held_lock(const struct held_lock *hlock,
+				   const struct lockdep_map *lock)
 {
 	if (hlock->instance == lock)
 		return 1;
@@ -4685,7 +4721,7 @@ __lock_release(struct lockdep_map *lock, unsigned long ip)
 	return 0;
 }
 
-static nokprobe_inline
+static __always_inline
 int __lock_is_held(const struct lockdep_map *lock, int read)
 {
 	struct task_struct *curr = current;
@@ -4945,7 +4981,7 @@ void lock_release(struct lockdep_map *lock, unsigned long ip)
 }
 EXPORT_SYMBOL_GPL(lock_release);
 
-int lock_is_held_type(const struct lockdep_map *lock, int read)
+noinstr int lock_is_held_type(const struct lockdep_map *lock, int read)
 {
 	unsigned long flags;
 	int ret = 0;

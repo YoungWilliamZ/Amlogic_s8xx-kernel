@@ -948,8 +948,8 @@ static struct meson_bank meson8b_cbus_banks[] = {
 	 */
 	BANK("DIF",	 DIF_0_P,	DIF_4_N,     -1,  -1,   5,  8,  5,  8,
 	     12, 12,  13, 12,  14, 12),
-	BANK("BSD_EN",	 GPIO_BSD_EN,	GPIO_BSD_EN, -1,  -1,  -1, -1,  2,  0,
-	     -1, -1,   0, 31,   0, 31),
+	BANK_DIR_QUIRK("BSD_EN",	 GPIO_BSD_EN,	GPIO_BSD_EN, -1,  -1,  -1, -1,  2,  0,
+	               -1, -1,   0, 31,   0, 31, MESON_DIR_QUIRK_OUTPUT_ONLY),
 };
 
 static struct meson_bank meson8b_aobus_banks[] = {
@@ -959,8 +959,8 @@ static struct meson_bank meson8b_aobus_banks[] = {
 	 */
 	BANK("AO",     GPIOAO_0,    GPIOAO_13,     0, 13,  0, 16,  0,  0,
 	      0,  0,  0, 16,  1,  0),
-	BANK("TEST_N", GPIO_TEST_N, GPIO_TEST_N,  -1, -1,  0, 30,  0, 14,
-	     -1, -1,  0, 31,  0, 31),
+	BANK_DIR_QUIRK("TEST_N", GPIO_TEST_N, GPIO_TEST_N,  -1, -1,  0, 30,  0, 14,
+	               -1, -1,  0, 31,  0, 31, MESON_DIR_QUIRK_REG_SEC_DIR),
 };
 
 static struct meson_pinctrl_data meson8b_cbus_pinctrl_data = {
@@ -987,7 +987,7 @@ static struct meson_pinctrl_data meson8b_aobus_pinctrl_data = {
 	.num_funcs	= ARRAY_SIZE(meson8b_aobus_functions),
 	.num_banks	= ARRAY_SIZE(meson8b_aobus_banks),
 	.pmx_ops	= &meson8_pmx_ops,
-	.parse_dt	= &meson8_aobus_parse_dt_extra,
+	.parse_dt	= &meson8_aobus_parse_dt,
 };
 
 static const struct of_device_id meson8b_pinctrl_dt_match[] = {
